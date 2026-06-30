@@ -131,7 +131,7 @@ export default function RSMMRDrillDownPage() {
     fetch(`/api/v1/rsm/mr/${mr_id}`)
       .then((r) => r.json())
       .then((json) => {
-        if (json.data) setHcps(json.data.hcps ?? []);
+        if (json.hcps) setHcps(json.hcps ?? []);
         else setError("Failed to load MR data.");
       })
       .catch(() => setError("Network error."))

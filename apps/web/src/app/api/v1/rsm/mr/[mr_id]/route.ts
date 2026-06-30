@@ -64,8 +64,7 @@ async function handler(
         .select({
           actionId: nbaActionLog.actionId,
           actionType: nbaActionLog.actionType,
-          outcome: nbaActionLog.outcome,
-          notes: nbaActionLog.notes,
+          metadata: nbaActionLog.metadata,
           timestamp: nbaActionLog.timestamp,
         })
         .from(nbaActionLog)
@@ -85,7 +84,13 @@ async function handler(
         ...hcp,
         urgencyLevel: card?.urgencyLevel ?? null,
         priorityScore: card?.priorityScore ?? null,
-        recentActions: actions,
+        recentActions: actions.map((a) => ({
+          actionId: a.actionId,
+          actionType: a.actionType,
+          outcome: (a.metadata as { outcome?: string } | null)?.outcome ?? null,
+          notes: (a.metadata as { notes?: string } | null)?.notes ?? null,
+          timestamp: a.timestamp,
+        })),
       };
     })
   );

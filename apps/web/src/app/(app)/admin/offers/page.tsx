@@ -231,7 +231,7 @@ export default function AdminOffersPage() {
     try {
       const res = await fetch("/api/v1/admin/offers");
       const json = await res.json();
-      setOffers(json.data?.data ?? []);
+      setOffers(json.data ?? []);
     } catch {
       setFetchError("Failed to load offers.");
     } finally {
