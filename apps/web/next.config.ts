@@ -25,6 +25,7 @@ const securityHeaders = [
 ];
 
 const baseConfig: NextConfig = {
+  transpilePackages: ["@opennba/db"],
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

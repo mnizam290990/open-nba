@@ -3,6 +3,8 @@
 > A modular, agentic, open-architecture NBA platform that helps Medical Representatives re-engage HCPs at the right time with the right context — deployed on hyperscaler infrastructure at a fraction of the cost of Pega CDH or Salesforce Marketing Cloud.
 
 [![CI](https://github.com/mnizam290990/open-nba/actions/workflows/ci.yml/badge.svg)](https://github.com/mnizam290990/open-nba/actions/workflows/ci.yml)
+[![Branch Name](https://github.com/mnizam290990/open-nba/actions/workflows/branch-name.yml/badge.svg)](https://github.com/mnizam290990/open-nba/actions/workflows/branch-name.yml)
+[![Secret Scan](https://github.com/mnizam290990/open-nba/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/mnizam290990/open-nba/actions/workflows/secret-scan.yml)
 
 ---
 

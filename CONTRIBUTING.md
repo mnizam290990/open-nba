@@ -90,14 +90,42 @@ Before opening a PR, verify:
 # All unit tests
 pnpm test
 
-# Frontend unit tests with coverage
-pnpm --filter=web test:coverage
+# Frontend unit tests with coverage (fails if < 80%)
+pnpm --filter=@open-nba/web test:coverage
 
-# Python tests with coverage
+# Python tests with coverage (fails if < 80%)
 cd services/agent && uv run pytest --cov --cov-fail-under=80
 
-# Playwright E2E (requires running app)
-pnpm --filter=web test:e2e
+# Playwright E2E (requires a running app or VERCEL preview URL)
+pnpm --filter=@open-nba/web test:e2e
+
+# Run against a deployed preview URL
+BASE_URL=https://opennba-pr-123.vercel.app pnpm --filter=@open-nba/web test:e2e
+```
+
+### Offline Queue Testing
+
+To test the offline action queue locally:
+
+1. Open Chrome DevTools → Network → Offline
+2. Take an action on a card (Dismiss, Snooze, Log Call)
+3. Confirm the action is queued (no API call fires)
+4. Switch back to Online
+5. The queued actions replay automatically — verify the card disappears / the server state updates
+
+### Security Headers Check
+
+```bash
+pnpm headers:check
+```
+
+Verifies that all required headers (`CSP`, `X-Frame-Options`, `HSTS`, etc.) are present in `next.config.ts`.
+
+### Docker Build Check
+
+```bash
+docker build -t opennba-agent:local services/agent/
+docker image inspect opennba-agent:local --format='{{.Size}}'
 ```
 
 ---

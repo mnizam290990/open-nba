@@ -27,60 +27,79 @@ openNBA uses **GitHub Actions** for CI and **Vercel** for continuous deployment 
 PR pushed
   │
   ▼
-[Stage 1] Lint (ESLint + Prettier)
-  │ passes
+[Stage 1] Lint & Type-Check & Security Headers (parallel)
+  │  +─── Python ruff/mypy/pytest (parallel)
+  │  +─── Docker build + Trivy scan (parallel)
+  │  +─── DB migration dry-run (parallel)
+  │ all pass
   ▼
-[Stage 2] Type Check (tsc --noEmit)
-  │ passes
+[Stage 2] Frontend Unit Tests (Vitest ≥ 80% coverage)
+  │
   ▼
-[Stage 3] Unit Tests (Vitest, coverage ≥ 80%)
-  │ passes
+[Stage 3] Python Agent Tests (pytest ≥ 80% coverage)
+  │
   ▼
-[Stage 4] Build (next build, all packages)
+[Stage 4] Docker Build & Trivy CVE Scan (≤ 500 MB, no CRITICAL/HIGH)
   │
   ├── on PR → Vercel creates a preview deployment
+  │            + Playwright E2E smoke suite runs against preview URL
   └── on merge to main → Vercel promotes to production
 ```
+
+### Additional Workflows
+
+| Workflow | Trigger | Purpose |
+|---|---|---|
+| `branch-name.yml` | PR opened/updated | Enforce `<type>/<ticket>-description` naming |
+| `secret-scan.yml` | Push + PR | TruffleHog verified-secret scanning |
 
 ---
 
 ## 2. Pipeline Stages
 
-### Stage 1: Lint
+### Stage 1: Lint & Type-Check (job: `lint`)
 
-- **Tool:** ESLint (Next.js + TypeScript ruleset) + Prettier
-- **Command:** `pnpm lint && pnpm format:check`
-- **Failure:** Any ESLint error or formatting mismatch blocks the pipeline
-- **Config files:**
-  - `apps/web/eslint.config.mjs`
-  - `.prettierrc`
-  - `.prettierignore`
+- **Tools:** ESLint, Prettier, `tsc --noEmit`, custom `headers-check.mjs`
+- **Commands:** `pnpm lint`, `pnpm type-check`, `pnpm format:check`, `pnpm headers:check`
+- **Failure:** Any ESLint error, TS error, formatting mismatch, or missing security header blocks all downstream stages
+- **Config files:** `apps/web/eslint.config.mjs`, `.prettierrc`, `apps/web/scripts/headers-check.mjs`
 
-### Stage 2: Type Check
+### Stage 2: Frontend Unit Tests (job: `test-frontend`)
 
-- **Tool:** TypeScript compiler (`tsc --noEmit`)
-- **Command:** `pnpm type-check`
-- **Runs after:** Stage 1 (lint must pass)
-- **Failure:** Any TypeScript error blocks the pipeline
+- **Tool:** Vitest 2.x + React Testing Library
+- **Command:** `pnpm --filter=@open-nba/web test:coverage`
+- **Coverage gate:** ≥ 80% lines & branches (vitest `thresholds` in `vitest.config.ts`)
+- **Artifacts:** `frontend-coverage` (HTML report, 14 days)
+- **Failure:** Test failure or coverage below gate blocks E2E stage
 
-### Stage 3: Unit Tests
+### Stage 3: Python Agent Tests (job: `test-agent`)
 
-- **Tool:** Vitest + React Testing Library (frontend)
-- **Command:** `pnpm test:coverage`
-- **Coverage gates:**
-  - Lines: ≥ 80%
-  - Functions: ≥ 80%
-  - Branches: ≥ 80%
-  - Statements: ≥ 80%
-- **Artifacts:** Coverage HTML report uploaded as `coverage-report-frontend` (retained 7 days)
-- **Failure:** Test failure **or** coverage below threshold blocks the pipeline
+- **Tools:** ruff (lint + format), mypy, pytest-cov
+- **Commands:** `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy .`, `uv run pytest --cov-fail-under=80`
+- **Artifacts:** `python-coverage` (HTML report, 14 days)
+- **Failure:** Lint error, type error, test failure, or < 80% coverage blocks E2E stage
 
-### Stage 4: Build
+### Stage 4: DB Migration Dry-Run (job: `db-migrate-check`)
 
-- **Tool:** `next build` (Turborepo)
-- **Command:** `pnpm build`
-- **Runs after:** Stage 3 (tests must pass)
-- **Failure:** Build error blocks merge (and Vercel deployment)
+- **Command:** `pnpm db:migrate:check`
+- **Env:** Requires `CI_DATABASE_URL` secret
+- **Failure:** Pending or conflicting migrations block merge
+
+### Stage 5: Docker Build & Trivy Scan (job: `docker-security`)
+
+- **Build:** `docker build services/agent/Dockerfile` → image `opennba-agent:ci`
+- **Size gate:** Image must be ≤ 500 MB
+- **Scanner:** Trivy — fails on any `CRITICAL` or `HIGH` CVE in `os` or `library` packages
+- **Artifacts:** `trivy-results` (SARIF, 14 days)
+- **Failure:** Build failure, image > 500 MB, or unfixed CVE blocks merge
+
+### Stage 6: Playwright E2E (job: `e2e`, main branch only)
+
+- **Tool:** Playwright 1.x (Chromium)
+- **Requires:** `VERCEL_PREVIEW_URL` secret (set automatically by Vercel GitHub App)
+- **Tests:** E2E-001 through E2E-009 (9 specs, ~25 test cases)
+- **Artifacts:** `playwright-report` (HTML, 30 days)
+- **Failure:** Any non-skipped Playwright assertion failure blocks merge
 
 ---
 
@@ -90,6 +109,12 @@ PR pushed
 |---|---|---|
 | `push` | All branches | Stages 1–4 |
 | `pull_request` targeting `main` | Any head branch | Stages 1–4 |
+
+| Event | Branches | Jobs Run |
+|---|---|---|
+| `push` | All branches | Stages 1–5 |
+| `pull_request` targeting `main` | Any head branch | Stages 1–5 + branch-name check + secret scan |
+| `push` to `main` | `main` only | Stages 1–6 (E2E included) |
 
 **Concurrency:** Only one CI run per branch at a time. A new push cancels in-progress runs on the same branch (`cancel-in-progress: true`).
 

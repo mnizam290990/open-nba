@@ -60,8 +60,12 @@ open-nba/                          # Monorepo root
 │   └── local/                     # Docker Compose for local development
 │
 ├── .github/
-│   └── workflows/
-│       └── ci.yml                 # GitHub Actions CI pipeline
+│   ├── workflows/
+│   │   ├── ci.yml                 # Main 6-stage CI pipeline
+│   │   ├── branch-name.yml        # Branch naming convention enforcement
+│   │   └── secret-scan.yml        # TruffleHog secret scanning
+│   ├── dependabot.yml             # Automated dependency updates (npm + pip + actions)
+│   └── PULL_REQUEST_TEMPLATE.md   # PR checklist template
 │
 ├── .env.example                   # Environment variable template
 ├── .gitignore
@@ -205,3 +209,46 @@ All services share the same `.env.example` template at the repo root. Each appli
 | `DATA_MODE` | All services — controls MOCK vs LIVE data provider |
 
 See [`.env.example`](../.env.example) for the full variable reference with inline comments.
+
+---
+
+## 8. New Components (Phase 2–11 additions)
+
+### Frontend utilities (`apps/web/src/`)
+
+| Path | Purpose |
+|---|---|
+| `hooks/usePullToRefresh.ts` | Touch gesture hook that triggers a feed refresh when pulled past 80 px |
+| `hooks/useOfflineQueue.ts` | Detects online/offline transitions; replays IndexedDB queue on reconnect |
+| `lib/offline-queue.ts` | IndexedDB-backed action queue for offline DISMISS / SNOOZE / LOG_CALL |
+| `lib/rate-limit.ts` | In-memory per-user rate limiter (replace with Redis/Upstash for multi-instance) |
+| `lib/logger.ts` | Structured JSON logger (pino); redacts PII fields in all log objects |
+| `components/layout/AppLayoutClient.tsx` | Client-side wrapper that owns offline-queue context + conflict banner |
+
+### BFF API Routes (`apps/web/src/app/api/v1/`)
+
+| Route | Method | Auth |
+|---|---|---|
+| `/rsm/team` | GET | RSM, ADMIN |
+| `/rsm/compliance` | GET | RSM, ADMIN |
+| `/admin/offers` | GET, POST | ADMIN |
+| `/admin/offers/[offer_id]` | GET, PATCH, DELETE | ADMIN |
+
+### Python Agent Service (`services/agent/`)
+
+| Path | Purpose |
+|---|---|
+| `adapters/base.py` | `OfferAdapter` Protocol — typed interface for offer catalog adapters |
+| `adapters/native_adapter.py` | PostgreSQL-backed offer adapter |
+| `adapters/veeva_vault_adapter.py` | Veeva Vault stub (Phase 1 TODO) |
+| `adapters/sap_adapter.py` | SAP stub (Phase 1 TODO) |
+| `adapters/registry.py` | Factory — reads `OFFER_ADAPTER` env var and returns the correct adapter |
+| `utils/sanitize.py` | LLM prompt input sanitiser — strips control chars + injection patterns |
+
+### CI Workflows (`.github/workflows/`)
+
+| Workflow | Trigger | Purpose |
+|---|---|---|
+| `ci.yml` | push + PR | 6-stage pipeline: lint → unit tests → docker+trivy → E2E |
+| `branch-name.yml` | PR opened/updated | Enforces `<type>/<ticket>-description` naming |
+| `secret-scan.yml` | push + PR | TruffleHog verified-secrets scan |

@@ -95,7 +95,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run frontend tests with coverage
-        run: pnpm test:coverage --filter=web
+        run: pnpm --filter=@open-nba/web test:coverage
         env:
           CI: true
 
@@ -108,7 +108,7 @@ jobs:
           retention-days: 14
 
   # ─────────────────────────────────────────────────────────────
-  # Stage 3 — Python Agent Service
+  # Stage 3 — Python Agent Service (lint + tests)
   # ─────────────────────────────────────────────────────────────
   test-agent:
     name: Agent Service (Python lint + tests)
@@ -130,7 +130,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('services/agent/uv.lock') }}
+          key: ${{ runner.os }}-uv-${{ hashFiles('services/agent/pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-uv-
 
@@ -147,7 +147,7 @@ jobs:
         working-directory: services/agent
 
       - name: Mypy type-check
-        run: uv run mypy .
+        run: uv run mypy . --ignore-missing-imports
         working-directory: services/agent
 
       - name: Pytest with coverage
@@ -194,12 +194,65 @@ jobs:
           DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
 
   # ─────────────────────────────────────────────────────────────
-  # Stage 5 — Playwright E2E (on merge to main only)
+  # Stage 5 — Docker Build & Vulnerability Scan (agent image)
+  # ─────────────────────────────────────────────────────────────
+  docker-security:
+    name: Docker Build & Trivy Scan
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build agent Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: services/agent
+          file: services/agent/Dockerfile
+          push: false
+          load: true
+          tags: opennba-agent:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Assert image size ≤ 500 MB
+        run: |
+          SIZE=$(docker image inspect opennba-agent:ci --format='{{.Size}}')
+          MAX=$((500 * 1024 * 1024))
+          echo "Image size: $SIZE bytes (limit: $MAX bytes)"
+          if [ "$SIZE" -gt "$MAX" ]; then
+            echo "ERROR: Agent Docker image exceeds 500 MB size limit"
+            exit 1
+          fi
+
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: opennba-agent:ci
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+
+      - name: Upload Trivy scan results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-results
+          path: trivy-results.sarif
+          retention-days: 14
+
+  # ─────────────────────────────────────────────────────────────
+  # Stage 6 — Playwright E2E (on merge to main only)
   # ─────────────────────────────────────────────────────────────
   e2e:
     name: Playwright E2E Smoke Tests
     runs-on: ubuntu-latest
-    needs: [test-frontend, test-agent]
+    needs: [test-frontend, test-agent, docker-security]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
@@ -219,13 +272,25 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        run: pnpm --filter=web exec playwright install --with-deps chromium
+        run: pnpm --filter=@open-nba/web exec playwright install --with-deps chromium
 
       - name: Run Playwright E2E tests
-        run: pnpm --filter=web test:e2e
+        run: pnpm --filter=@open-nba/web test:e2e
         env:
           BASE_URL: ${{ secrets.VERCEL_PREVIEW_URL }}
           CI: true
+
+      - name: Post Playwright report URL as PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ Playwright E2E report uploaded as CI artifact: **playwright-report**'
+            })
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4

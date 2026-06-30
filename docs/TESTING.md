@@ -5,7 +5,7 @@
 openNBA uses a three-layer testing pyramid:
 
 ```
-E2E (Playwright)        ←  8 smoke tests, run on merge to main
+E2E (Playwright)        ←  9 specs (8 active + 1 partial for Phase 14), run on merge to main
 Integration Tests       ←  ≥ 60% coverage on agent service
 Unit Tests              ←  ≥ 80% coverage (frontend + agent service)
 ```
@@ -99,14 +99,15 @@ BASE_URL=https://opennba.vercel.app pnpm --filter=web test:e2e
 
 | Test ID | Description |
 |---|---|
-| E2E-001 | MR Login — login with valid credentials, see NBA feed |
-| E2E-002 | Card Actions — Dismiss removes card from feed |
-| E2E-003 | Snooze — Snooze removes card from immediate view |
-| E2E-004 | Detail Panel — tap card → panel opens, three talking points visible |
-| E2E-005 | RSM View — RSM sees compliance rate dashboard |
-| E2E-006 | Admin Toggle — Admin sees DATA_MODE toggle and checklist |
-| E2E-007 | RBAC Guard — MR navigating to /admin redirected with Access Denied |
-| E2E-008 | Offline Banner — network disconnect shows offline banner |
+| E2E-001 | MR Login — login with valid credentials, see NBA feed | Active |
+| E2E-002 | Card Actions — Dismiss removes card from feed | Active |
+| E2E-003 | Snooze — Snooze removes card from immediate view | Active |
+| E2E-004 | Detail Panel — tap card → panel opens, three talking points visible | Active |
+| E2E-005 | RSM View — RSM sees compliance rate dashboard | Active |
+| E2E-006 | Admin Toggle — Admin sees DATA_MODE toggle and checklist | Active |
+| E2E-007 | RBAC Guard — MR navigating to /admin redirected with Access Denied | Active |
+| E2E-008 | Offline Banner — network disconnect shows offline banner | Active |
+| E2E-009 | Post-Event Card — event badge and outreach draft visible (Phase 14) | Partial (skipped tests pending Phase 14) |
 
 ### Adding a New E2E Test
 

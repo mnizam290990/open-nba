@@ -1,0 +1,37 @@
+name: Branch Name Check
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize]
+
+jobs:
+  check-branch-name:
+    name: Validate Branch Name Convention
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch naming convention
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          echo "Branch name: $BRANCH"
+
+          # Allow: feat/<ticket>-description, fix/<ticket>-description,
+          #        chore/<ticket>-description, docs/<ticket>-description,
+          #        refactor/<ticket>-description, test/<ticket>-description,
+          #        release/<version>, hotfix/<ticket>-description
+          PATTERN="^(feat|fix|chore|docs|refactor|test|release|hotfix)\/[a-zA-Z0-9]+-[a-zA-Z0-9_-]+$"
+
+          if echo "$BRANCH" | grep -Eq "$PATTERN"; then
+            echo "Branch name '$BRANCH' follows the naming convention."
+          else
+            echo ""
+            echo "ERROR: Branch name '$BRANCH' does not follow the required convention."
+            echo ""
+            echo "Required format: <type>/<ticket-id>-short-description"
+            echo "Examples:"
+            echo "  feat/NBA-123-mr-login-flow"
+            echo "  fix/NBA-456-fix-snooze-timer"
+            echo "  chore/NBA-789-update-deps"
+            echo ""
+            exit 1
+          fi

@@ -132,11 +132,49 @@ Blocks any commit that introduces a secret-shaped string (API keys, connection s
 
 ## LLM Call Security
 
-Before every LLM call, the `ContextSynthesisAgent` de-identifies the HCP context:
-- HCP name → `[HCP_NAME]`
-- `hcp_id` → `[HCP_ID]`
-- NPI → `[NPI]`
-
-After the LLM response, the hallucination guardrail strips any sentence referencing a drug name not present in the active offer catalog.
+Before every LLM call, the `ContextSynthesisAgent`:
+1. **De-identifies** HCP context: name → `[HCP_NAME]`, `hcp_id` → `[HCP_ID]`, NPI → `[NPI]`
+2. **Sanitizes** all CRM-sourced strings via `utils/sanitize.py`:
+   - Strips ASCII control characters (except safe `\n`, `\t`)
+   - Normalises Unicode to NFKC to block homoglyph attacks
+   - Removes known prompt-injection patterns (`ignore all previous instructions`, `act as`, etc.)
+   - Truncates inputs to 2,000 characters maximum
+3. **Hallucinaton guardrail**: strips any sentence referencing a drug name not present in the active offer catalog after the LLM response.
 
 LLM API keys are stored in environment variables only — never in code, logs, or database.
+
+---
+
+## Per-User API Rate Limiting
+
+Implemented in `apps/web/src/lib/rate-limit.ts` (in-memory; use Redis/Upstash for multi-instance production).
+
+| Endpoint | Limit | Window |
+|---|---|---|
+| `POST /api/v1/actions` | 30 req/min per user | 60 seconds |
+| All other API routes | 60 req/min per user | 60 seconds |
+
+Rate-limit headers returned on rejection:
+- `Retry-After`: seconds until the window resets
+- `X-RateLimit-Remaining: 0`
+
+---
+
+## Offline Action Queue Security
+
+Actions queued in IndexedDB (when offline) are replayed via `lib/offline-queue.ts` on reconnect.
+
+Security properties:
+- Queued actions include only `hcpId`, `actionType`, and optional `notes` — no auth tokens
+- Replay uses the current session cookie (re-validated server-side per request)
+- Conflicting server state always wins; the MR is notified via in-app banner
+- On HTTP 422/400 from server, the queued action is discarded to prevent replay loops
+
+---
+
+## Structured Logging
+
+All server-side logs emit structured JSON via `pino` (`apps/web/src/lib/logger.ts`):
+- Fields: `timestamp`, `level`, `service`, `trace_id`, `mr_id` (UUID only), `event_type`, `message`
+- `pino` `redact` config strips `*.name`, `*.npi`, `*.email`, `*.passwordHash` from all log objects
+- Log level controlled by `LOG_LEVEL` env var (default: `info` in production, `debug` in dev)
