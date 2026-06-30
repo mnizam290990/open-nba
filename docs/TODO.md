@@ -613,6 +613,57 @@ Follow the SAF Playwright standards: `data-testid` locators only, no hardcoded w
 
 ---
 
+## Phase 14 — HCP-Centric e-Detailing Personalization
+
+> **Goal:** Evolve the NBA card from a simple gap alert into a rich, personalized engagement tool — covering intelligent re-engagement, personalized e-detailing, and post-event scientific follow-up.
+>
+> **Linked requirements:** FR-066 to FR-076
+
+### 14.1 Intelligent Re-Engagement (FR-066 – FR-069)
+
+- [ ] **FR-066** Add `previous_discussions` section to the HCP detail panel — display topics covered, MR notes, and HCP responses sourced from `visit_logs.notes`; limit to last 10 visits
+- [ ] **FR-066** Add `GET /api/v1/hcps/[hcp_id]/discussion-history` BFF route returning paginated visit note summaries for the authenticated MR
+- [ ] **FR-067** Extend the Context Synthesis Agent to run an NLP extraction pass on `visit_logs.notes` to detect commitment phrases (e.g., "will send", "follow up on", "promised"); store detected items in a new `visit_commitments` table (`commitment_id`, `visit_id`, `hcp_id`, `mr_id`, `text`, `detected_at`, `resolved`)
+- [ ] **FR-067** Display pending commitments as a distinct "Open Follow-ups" list on the HCP detail panel; mark an item resolved when the MR logs a `LOG_CALL` action against the same HCP
+- [ ] **FR-067** Add `data-testid="open-followups-list"` and `data-testid="followup-item"` to the follow-up list elements 🧪
+- [ ] **FR-068** Extend the Context Synthesis Agent to generate up to 3 scientific discussion topic recommendations per HCP, grounded in specialty, therapy area, and historical interaction topics; validate all topic references against the active offer catalog before display 🔒
+- [ ] **FR-068** Surface discussion topic recommendations on the HCP detail panel under a "Suggested Discussion Topics" section with `data-testid="discussion-topic-{n}"` 🧪
+- [ ] **FR-069** Extend the Context Synthesis Agent to generate up to 3 personalized conversation starters per HCP; de-identify context before each LLM call; store starters in the NBA card payload 🔒
+- [ ] **FR-069** Display conversation starters on the HCP detail panel under a "Conversation Starters" section; add a copy-to-clipboard button per starter
+- [ ] Write unit tests for commitment extraction: present in notes, absent, and ambiguous phrasing 🧪
+- [ ] Write unit tests for discussion topic generation: valid catalog references, hallucinated reference (must be stripped) 🧪
+- [ ] Document the commitment detection pattern list and how to extend it in `docs/AGENT_PIPELINE.md` 📝
+
+### 14.2 Personalized e-Detailing (FR-070 – FR-073)
+
+- [ ] **FR-070** Add an `hcp_engagement_profile` table: `hcp_id`, `mr_id`, `content_type`, `topic`, `engagement_score`, `last_updated`; populate from `nba_action_log` and `visit_logs` on the weekly re-weighting job
+- [ ] **FR-070** Extend `GET /api/v1/hcps/[hcp_id]` to include a `preferred_topics` array derived from the engagement profile
+- [ ] **FR-071** Implement an `OptimalDetailingSequenceAgent` (or extend `OfferRecommendationAgent`) that returns an ordered list of up to 5 content assets, ranked by the HCP's engagement profile; use a heuristic ranking in Phase 0 (specialty match + engagement score)
+- [ ] **FR-071** Expose the detailing sequence as a `detailing_sequence[]` field on the NBA card API response and display it as a numbered list on the HCP detail panel under "Recommended Detailing Order" 🔒
+- [ ] **FR-072** Mark high-engagement assets with a "High Engagement" badge (`data-testid="high-engagement-badge"`) on the HCP detail panel; derive the badge from the `engagement_score` percentile within the HCP's specialty peer group 🧪
+- [ ] **FR-073** Implement per-HCP content suppression: after 3 consecutive low-engagement interactions with an asset, add it to a `suppressed_assets` list in the engagement profile; suppressed assets SHALL NOT appear in the primary detailing sequence
+- [ ] **FR-073** Add a "More content" collapsible drawer on the HCP detail panel showing suppressed assets with a "Why hidden?" tooltip
+- [ ] Write unit tests for detailing sequence ranking: high-engagement asset ranks first, low-engagement asset ranks last 🧪
+- [ ] Write unit tests for suppression threshold: exactly 3 low-engagement interactions triggers suppression, 2 does not 🧪
+
+### 14.3 Post-Event Scientific Engagement (FR-074 – FR-076)
+
+- [ ] **FR-074** Add `hcp_events` table: `event_id`, `name`, `date`, `end_date`, `type` (`CONFERENCE | CME | PRODUCT_LAUNCH | OTHER`), `therapy_area`, `hcp_ids[]` (stored as a junction table `event_hcp`), `tenant_id`
+- [ ] **FR-074** Add `POST /api/v1/admin/events` and `GET /api/v1/admin/events` routes (Admin role required) to allow manual entry of event attendance records 🔒
+- [ ] **FR-074** Extend the Gap Detection Agent to also flag HCPs with a qualifying event end date within the past 48 hours; generate a `POST_EVENT_FOLLOWUP` NBA card type with elevated priority
+- [ ] **FR-074** Surface post-event cards with a distinct "Post-Event Follow-up" badge on the MR feed (`data-testid="post-event-badge"`) 🧪
+- [ ] **FR-075** Extend the Context Synthesis Agent to generate a personalized outreach message draft for post-event cards: reference the event name, align to the HCP's clinical interests; de-identify all context before the LLM call 🔒
+- [ ] **FR-075** Display the outreach draft in a rich-text editor (editable) on the post-event HCP detail panel; add a "Copy draft" button with `data-testid="copy-draft-btn"` 🧪
+- [ ] **FR-075** Store the outreach draft (original + edited version) in `nba_action_log` as `action_type = DRAFT_MESSAGE` when the MR copies or sends it 🔒
+- [ ] **FR-076** Extend the offer matching in `OfferRecommendationAgent` to accept an `event_topic` filter parameter; surface matched assets on the post-event card
+- [ ] **FR-076** If no catalog asset matches the event topic, display "No relevant materials for this event" placeholder and still surface the outreach draft (FR-075)
+- [ ] Write unit tests for post-event card triggering: event ended < 48 hours ago (triggers), > 48 hours ago (does not trigger) 🧪
+- [ ] Write unit tests for outreach draft generation: valid draft, de-identification check (no HCP name in LLM input), no matching asset fallback 🧪
+- [ ] Add Playwright E2E test **E2E-009 — Post-Event Card**: Admin creates an event → MR feed shows post-event card within refresh → MR opens detail panel → outreach draft and event badge are visible 🧪
+- [ ] Document the post-event flow, `hcp_events` schema, and how to add event sources in `docs/AGENT_PIPELINE.md` 📝
+
+---
+
 ## Phase 0 Demo — Completion Checklist
 
 > Use this checklist to confirm Phase 0 is ready for stakeholder presentation.

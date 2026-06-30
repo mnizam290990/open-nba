@@ -1,7 +1,7 @@
 # openNBA — Functional & Non-Functional Requirements
 
-**Version:** 0.4
-**Status:** Draft — Pre-funding deployment constraints added
+**Version:** 0.5
+**Status:** Draft — HCP-centric e-detailing personalization added
 **Date:** June 2026
 **Linked PRD:** [PRD.md](PRD.md)
 
@@ -44,6 +44,7 @@ openNBA supports three deployment profiles across its lifecycle. Requirements th
    - [1.8 Tenant Management *(SaaS)*](#18-tenant-management-saas)
    - [1.9 Billing & Usage Metering *(SaaS)*](#19-billing--usage-metering-saas)
    - [1.10 Self-Serve Onboarding *(SaaS)*](#110-self-serve-onboarding-saas)
+   - [1.11 HCP-Centric e-Detailing Personalization](#111-hcp-centric-e-detailing-personalization)
 2. [Non-Functional Requirements](#2-non-functional-requirements)
    - [2.1 Performance](#21-performance)
    - [2.2 Availability & Reliability](#22-availability--reliability)
@@ -202,6 +203,42 @@ openNBA supports three deployment profiles across its lifecycle. Requirements th
 | FR-063 | The tenant admin SHALL be able to view an **onboarding progress tracker** showing completion percentage and blocking items for each wizard step. Incomplete steps SHALL prevent go-live but SHALL NOT block MOCK mode demo. | P1 [SaaS] | Visibility without blocking demo |
 | FR-064 | The **go-live readiness check** (final wizard step) SHALL run the same validation suite as FR-028 and present a pass/fail report. On full pass, the tenant admin SHALL request go-live approval. Nagarro super-admin SHALL receive an in-app notification and approve or reject within 48 hours. | P1 [SaaS] | Guided self-serve; Nagarro approves |
 | FR-065 | The platform SHALL surface an **in-app product changelog** to tenant admins, showing the last 10 release notes with dates and links to full docs. The changelog SHALL be Nagarro-authored and served from a CMS or static config. | P2 [SaaS] | SaaS standard practice |
+
+---
+
+### 1.11 HCP-Centric e-Detailing Personalization
+
+> Evolving e-detailing from one-size-fits-all to HCP-centric engagement. This section covers three personalization capability areas: Intelligent Re-Engagement, Personalized e-Detailing, and Post-Event Scientific Engagement.
+
+#### 1.11.1 Intelligent Re-Engagement
+
+| ID | Requirement | Priority | Notes |
+|---|---|---|---|
+| FR-066 | The HCP detail panel SHALL surface a **previous discussion history** summary: topics covered in past visits, MR notes, and recorded HCP responses. History SHALL be sourced from visit log notes and CRM interaction records. | P0 | Eliminates repetitive interactions; core re-engagement signal |
+| FR-067 | The Context Synthesis Agent SHALL detect and highlight **pending commitments and follow-ups** extracted from visit notes (e.g., "promised to send clinical study", "follow up on side effects question"). Pending items SHALL appear as a distinct list on the HCP detail panel. | P1 | NLP extraction from `visit_logs.notes`; flagged as `commitment_detected` |
+| FR-068 | The Context Synthesis Agent SHALL recommend up to **3 relevant scientific discussion topics** per HCP, aligned to the HCP's specialty, therapy area, and historical interaction patterns derived from past visit topics. | P1 | LLM-generated; must reference only content in the active offer catalog |
+| FR-069 | The system SHALL generate **personalized conversation starters** for the MR — short, context-aware opening lines grounded in the HCP's pending commitments, recent clinical events, and specialty — and display them on the HCP detail panel before a visit. | P1 | LLM-generated; de-identified context before inference; max 3 starters |
+
+---
+
+#### 1.11.2 Personalized e-Detailing
+
+| ID | Requirement | Priority | Notes |
+|---|---|---|---|
+| FR-070 | The system SHALL identify and surface the HCP's **preferred content types and clinical topics** based on historical engagement signals: time spent on materials, content assets shared in past visits, and action feedback (`LOG_CALL` notes). | P1 | Derived from `nba_action_log` and visit notes; updated weekly |
+| FR-071 | The Offer Recommendation Agent SHALL recommend an **optimal detailing sequence** — an ordered list of up to 5 content assets — personalized to the HCP's engagement profile and specialty. The sequence SHALL be visible to the MR before a visit. | P2 | Ranking model seeded with engagement history; heuristic in Phase 0 |
+| FR-072 | The HCP detail panel SHALL visually **highlight high-engagement content assets** (those that have demonstrated strong engagement for the HCP or their specialty/tier peer group) to help MRs prioritise detailing time. | P1 | Peer-group signal derived from anonymised cohort data within the tenant |
+| FR-073 | The system SHALL **suppress or de-prioritize content assets** that have consistently received low engagement signals from a specific HCP (≥ 3 consecutive low-engagement interactions). Suppressed assets SHALL remain accessible in a "More content" drawer but SHALL NOT appear in the primary detailing sequence. | P2 | Prevents MR fatigue and irrelevant repetition; per-HCP suppression list |
+
+---
+
+#### 1.11.3 Post-Event Scientific Engagement
+
+| ID | Requirement | Priority | Notes |
+|---|---|---|---|
+| FR-074 | The system SHALL **trigger event-specific follow-up NBA cards** when an HCP has attended a medical conference, CME event, or product launch. Event attendance data SHALL be ingested from CRM tags or a manual admin-entered event record. The follow-up card SHALL be surfaced within 48 hours of the event end date. | P1 | Event entity: `event_id`, `name`, `date`, `type`, `hcp_ids[]`; stored in `hcp_events` table |
+| FR-075 | The Context Synthesis Agent SHALL generate a **personalized outreach message draft** for the MR to send (via call or message) after a scientific event. The draft SHALL reference the event by name and align to the HCP's known clinical interests. The MR SHALL be able to edit the draft before sending. | P1 | LLM-generated; de-identified; draft stored in `nba_action_log` as `DRAFT_MESSAGE` |
+| FR-076 | Post-event NBA cards SHALL surface **relevant clinical evidence and materials** (from the active offer catalog) aligned to the event's therapy area and the HCP's specialty. At least one content asset SHALL be attached; if none is available, the card SHALL display "No relevant materials for this event" and still surface the outreach draft. | P1 | Offer matching extends the FR-008 logic with an `event_topic` filter parameter |
 
 ---
 
