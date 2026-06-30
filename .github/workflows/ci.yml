@@ -1,0 +1,236 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Stage 1 — Lint & Type-Check (Node / Next.js)
+  # ─────────────────────────────────────────────────────────────
+  lint:
+    name: Lint & Type-Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type-check
+        run: pnpm type-check
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Security headers check
+        run: pnpm headers:check
+
+  # ─────────────────────────────────────────────────────────────
+  # Stage 2 — Unit Tests (Frontend)
+  # ─────────────────────────────────────────────────────────────
+  test-frontend:
+    name: Frontend Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run frontend tests with coverage
+        run: pnpm test:coverage --filter=web
+        env:
+          CI: true
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-coverage
+          path: apps/web/coverage/
+          retention-days: 14
+
+  # ─────────────────────────────────────────────────────────────
+  # Stage 3 — Python Agent Service
+  # ─────────────────────────────────────────────────────────────
+  test-agent:
+    name: Agent Service (Python lint + tests)
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('services/agent/uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
+      - name: Install Python dependencies
+        run: uv sync --all-extras
+        working-directory: services/agent
+
+      - name: Ruff lint
+        run: uv run ruff check .
+        working-directory: services/agent
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+        working-directory: services/agent
+
+      - name: Mypy type-check
+        run: uv run mypy .
+        working-directory: services/agent
+
+      - name: Pytest with coverage
+        run: uv run pytest --cov --cov-fail-under=80 --cov-report=xml --cov-report=html
+        working-directory: services/agent
+        env:
+          DATA_MODE: MOCK
+
+      - name: Upload Python coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: python-coverage
+          path: services/agent/htmlcov/
+          retention-days: 14
+
+  # ─────────────────────────────────────────────────────────────
+  # Stage 4 — Database Migration Dry-Run
+  # ─────────────────────────────────────────────────────────────
+  db-migrate-check:
+    name: DB Migration Dry-Run
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: DB migration dry-run
+        run: pnpm db:migrate --check
+        env:
+          DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
+
+  # ─────────────────────────────────────────────────────────────
+  # Stage 5 — Playwright E2E (on merge to main only)
+  # ─────────────────────────────────────────────────────────────
+  e2e:
+    name: Playwright E2E Smoke Tests
+    runs-on: ubuntu-latest
+    needs: [test-frontend, test-agent]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm --filter=web exec playwright install --with-deps chromium
+
+      - name: Run Playwright E2E tests
+        run: pnpm --filter=web test:e2e
+        env:
+          BASE_URL: ${{ secrets.VERCEL_PREVIEW_URL }}
+          CI: true
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 30

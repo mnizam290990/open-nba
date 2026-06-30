@@ -1,0 +1,31 @@
+# =============================================================================
+# CODEOWNERS — openNBA
+# Defines default reviewers for each path.
+# Format: <pattern> <owner> [<owner> ...]
+# GitHub docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+# =============================================================================
+
+# Default: every path requires review from the core team
+*                           @mnizam290990
+
+# Frontend (Next.js web app)
+/apps/web/                  @mnizam290990
+
+# Agent service (Python / LangGraph)
+/services/agent/            @mnizam290990
+
+# Shared database package (schema + migrations)
+/packages/db/               @mnizam290990
+
+# Infrastructure / IaC (Terraform, Helm, Docker)
+/infra/                     @mnizam290990
+
+# CI/CD pipeline definitions
+/.github/                   @mnizam290990
+
+# Documentation
+/docs/                      @mnizam290990
+
+# Security-sensitive files — require explicit review
+.env.example                @mnizam290990
+CODEOWNERS                  @mnizam290990

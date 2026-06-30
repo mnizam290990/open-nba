@@ -1,0 +1,31 @@
+{
+  "name": "@opennba/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "generate": "drizzle-kit generate",
+    "migrate": "drizzle-kit migrate",
+    "migrate:check": "tsx src/migrate-check.ts",
+    "seed": "tsx src/seed.ts",
+    "reset": "tsx src/reset.ts",
+    "studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.38.3",
+    "@neondatabase/serverless": "^0.10.4",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.30.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "@types/node": "^20.17.14",
+    "bcryptjs": "^2.4.3",
+    "@types/bcryptjs": "^2.4.6",
+    "@faker-js/faker": "^9.3.0"
+  }
+}

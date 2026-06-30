@@ -2,6 +2,8 @@
 
 > A modular, agentic, open-architecture NBA platform that helps Medical Representatives re-engage HCPs at the right time with the right context — deployed on hyperscaler infrastructure at a fraction of the cost of Pega CDH or Salesforce Marketing Cloud.
 
+[![CI](https://github.com/mnizam290990/open-nba/actions/workflows/ci.yml/badge.svg)](https://github.com/mnizam290990/open-nba/actions/workflows/ci.yml)
+
 ---
 
 ## Why openNBA?
@@ -16,61 +18,101 @@
 
 ---
 
+## Live Demo
+
+> Deployment link will be added here once the Vercel project is connected.
+
+---
+
 ## Documentation Index
 
 | Document | Purpose | Audience |
 |---|---|---|
 | [PRD](docs/PRD.md) | Full product requirements document | Product, Leadership |
 | [Requirements](docs/requirements.md) | Functional & non-functional requirements (traceable) | Engineering, QA |
-| [Architecture](docs/architecture.md) | Technical design, ADRs, service map | Engineering, DevOps |
+| [Architecture](docs/ARCHITECTURE.md) | Technical design, ADRs, service map | Engineering, DevOps |
 | [User Stories](docs/user-stories.md) | Sprint-ready backlog stories | Engineering, Scrum |
+| [CI/CD](docs/CI_CD.md) | CI pipeline stages, triggers, and failure behaviour | Engineering, DevOps |
 
 ---
 
 ## Quick Start (Pilot — Mock Mode)
 
+### Prerequisites
+
+Ensure you have the following tools installed:
+
+| Tool | Version | Install |
+|---|---|---|
+| Node.js | 20.x LTS | [nodejs.org](https://nodejs.org) |
+| pnpm | 9.x | `npm i -g pnpm` |
+| Python | 3.12 | [python.org](https://python.org) |
+| Docker + Compose | Latest | [docker.com](https://docker.com) |
+| uv | Latest | `pip install uv` |
+
+### 1. Clone the repository
+
 ```bash
-# 1. Clone the repo
-git clone https://github.com/your-org/open-nba.git
+git clone https://github.com/mnizam290990/open-nba.git
 cd open-nba
-
-# 2. Copy environment config
-cp .env.example .env
-# Set DATA_MODE=MOCK in .env
-
-# 3. Start all services
-docker compose up --build
-
-# 4. Open the MR app
-open http://localhost:3000
 ```
+
+### 2. Configure environment variables
+
+```bash
+cp .env.example .env
+# Open .env and set DATA_MODE=MOCK (no other changes needed for local dev)
+```
+
+### 3. Install dependencies
+
+```bash
+pnpm install
+```
+
+### 4. Start all services (Docker Compose)
+
+```bash
+docker compose up --build
+```
+
+Or start only the Next.js web app for frontend development:
+
+```bash
+pnpm dev
+```
+
+### 5. Open the app
+
+| Service | URL |
+|---|---|
+| MR Web App | http://localhost:3000 |
+| Agent Service API | http://localhost:8001/docs |
+| Admin Console | http://localhost:3001 |
 
 The platform boots in **MOCK mode** by default — 500 synthetic HCPs, 18 months of visit history, pre-seeded 60-day gaps. No client data required.
 
 ---
 
-## Repository Structure (Target)
+## Repository Structure
 
 ```
 open-nba/
 ├── apps/
-│   ├── web/                   # React / Next.js MR frontend (PWA)
-│   └── admin/                 # RSM dashboard + admin console
+│   └── web/                   # Next.js 14 MR frontend (PWA) + BFF API routes
 ├── services/
-│   ├── agent-service/         # Python / LangGraph agent orchestration
-│   ├── offer-service/         # Pluggable offer & eligibility engine
-│   ├── bff/                   # Node.js / Fastify API gateway + BFF
-│   └── data-mock/             # Mock data provider + generator scripts
-├── infra/
-│   ├── terraform/             # IaC modules (AWS primary, AKS/GKE variants)
-│   └── helm/                  # Kubernetes Helm charts
-├── docs/
-│   ├── PRD.md
-│   ├── requirements.md
-│   ├── architecture.md
-│   └── user-stories.md
-├── docker-compose.yml
-├── .env.example
+│   └── agent/                 # Python FastAPI + LangGraph agent service
+├── packages/
+│   └── db/                    # Shared DB schema, migrations (Drizzle ORM), seed scripts
+├── docs/                      # Requirements, ADRs, runbooks, API specs
+├── infra/                     # Docker Compose (local), Helm charts (Phase 1+)
+├── .github/
+│   └── workflows/             # GitHub Actions CI/CD pipelines
+├── .env.example               # Environment variable template
+├── .gitignore
+├── CODEOWNERS
+├── package.json               # pnpm workspace root
+├── turbo.json                 # Turborepo task orchestration
 └── README.md
 ```
 
@@ -78,18 +120,41 @@ open-nba/
 
 ## Tech Stack
 
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                          Client Devices                             │
+│              MR Mobile (PWA)          RSM Web Dashboard             │
+└───────────────────┬────────────────────────┬───────────────────────┘
+                    │ HTTPS                  │ HTTPS
+┌───────────────────▼────────────────────────▼───────────────────────┐
+│            Next.js 14 (App Router) — Vercel Edge Network            │
+│         BFF API routes  |  Auth.js  |  Server Components            │
+└───────────────────────────────┬────────────────────────────────────┘
+                                │ HTTP (internal)
+┌───────────────────────────────▼────────────────────────────────────┐
+│             Python FastAPI + LangGraph Agent Service                 │
+│   Signal Harvester → Gap Detection → Scoring → Context Synthesis    │
+│              → Offer Recommendation → Rank & Publish                 │
+└────┬──────────────────────────────────────────────────┬────────────┘
+     │                                                  │
+┌────▼────────────────┐                     ┌───────────▼────────────┐
+│  PostgreSQL 16       │                     │  AWS Bedrock / OpenAI  │
+│  (Supabase / Neon)   │                     │  Claude 3.5 Sonnet     │
+│  + Weaviate (vector) │                     │  [de-identified input] │
+└─────────────────────┘                     └────────────────────────┘
+```
+
 | Layer | Technology |
 |---|---|
-| Frontend | React 18, Next.js 14, Tailwind CSS, PWA |
-| API Gateway / BFF | Node.js, Fastify, GraphQL |
-| Agent Orchestration | Python 3.11, LangGraph, LangChain |
+| Frontend | Next.js 14, TypeScript, Tailwind CSS, shadcn/ui, PWA |
+| BFF / API Routes | Next.js App Router API routes, Zod validation |
+| Agent Orchestration | Python 3.12, FastAPI, LangGraph |
 | LLM | AWS Bedrock (Claude 3.5 Sonnet) — PHI stays in VPC |
-| Offer / Rules Engine | Python, Open Policy Agent (OPA) |
-| Database | PostgreSQL 16 (structured), Weaviate (vector) |
-| Object Storage | AWS S3 (assets, documents) |
-| Infrastructure | Kubernetes (EKS), Terraform, Helm, GitHub Actions |
-| Auth | Keycloak (OIDC / OAuth2) |
-| Observability | OpenTelemetry, LangSmith, Grafana |
+| Database ORM | Drizzle ORM, PostgreSQL 16 |
+| Vector Store | Weaviate Cloud |
+| Auth | Auth.js v5 (NextAuth) + OIDC (Keycloak, Phase 1) |
+| CI/CD | GitHub Actions, Vercel (frontend), Render (agent service) |
+| Observability | LangSmith, OpenTelemetry, Grafana (Phase 1) |
 
 ---
 
@@ -104,10 +169,16 @@ Phase 3 (Month 6–12)  → Multi-client, self-serve vertical config, ML loop
 
 ---
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup instructions, coding standards, and the PR checklist.
+
+---
+
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE).
 
 ---
 
-*Initial specification generated: June 2026. Target client: Sun Pharma. Authored by Nagarro.*
+*Initial specification: June 2026. Target client: Sun Pharma. Authored by Nagarro.*
