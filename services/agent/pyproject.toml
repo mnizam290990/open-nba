@@ -12,7 +12,7 @@ dependencies = [
     "langgraph==0.2.61",
     "langchain==0.3.14",
     "langchain-openai==0.3.0",
-    "langchain-aws==0.2.9",
+    "langchain-aws==1.6.1",
     "langsmith==0.2.11",
     "asyncpg==0.30.0",
     "sqlalchemy==2.0.36",
