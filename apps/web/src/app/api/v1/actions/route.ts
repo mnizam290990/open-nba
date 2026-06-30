@@ -70,4 +70,4 @@ async function handler(req: AuthedRequest) {
   return ok({ actionId, status: "accepted" }, 202);
 }
 
-export const POST = withAuth(handler);
+export const POST = withAuth(handler, { rateLimit: 30 });

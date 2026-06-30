@@ -17,6 +17,7 @@ import structlog
 from typing import Any
 
 from models import NBACard, Offer, PipelineState, ScoredHCP, UrgencyLevel
+from utils.sanitize import sanitize_notes
 
 logger = structlog.get_logger(__name__)
 
@@ -150,8 +151,9 @@ async def run_context_synthesis(
         is_partial = False
 
         if signal:
+            safe_notes = sanitize_notes(signal.recent_notes)
             prompt = _build_prompt(
-                signal_notes=signal.recent_notes,
+                signal_notes=safe_notes,
                 specialty=signal.specialty.value,
                 tier=signal.tier.value,
                 days_gap=signal.days_since_last_visit,

@@ -7,6 +7,8 @@ import { HCPDetailPanel } from "@/components/feed/HCPDetailPanel";
 import { HCPFeedSkeleton } from "@/components/feed/HCPCardSkeleton";
 import { FeedErrorBoundary } from "@/components/layout/FeedErrorBoundary";
 import { Button } from "@/components/ui/button";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { enqueueAction, type ActionType } from "@/lib/offline-queue";
 
 export default function FeedPage() {
   const [cards, setCards] = useState<HCPCardData[]>([]);
@@ -25,7 +27,7 @@ export default function FeedPage() {
       if (!res.ok) throw new Error("Failed to load feed");
       const json = await res.json();
       setCards(json.data ?? []);
-    } catch (err) {
+    } catch {
       setError("Failed to load the NBA feed. Please try again.");
     } finally {
       setIsLoading(false);
@@ -37,11 +39,29 @@ export default function FeedPage() {
     loadFeed();
   }, [loadFeed]);
 
+  const handleRefresh = useCallback(() => loadFeed(true), [loadFeed]);
+
+  const { containerRef, isPulling, pullDistance } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    disabled: isLoading || isRefreshing,
+  });
+
   async function handleAction(
     cardId: string,
     hcpId: string,
-    actionType: "SCHEDULE_VISIT" | "LOG_CALL" | "DISMISS" | "SNOOZE"
+    actionType: ActionType
   ) {
+    if (!navigator.onLine) {
+      if (actionType === "DISMISS" || actionType === "SNOOZE" || actionType === "LOG_CALL") {
+        await enqueueAction({ hcpId, actionType });
+        if (actionType === "DISMISS" || actionType === "SNOOZE") {
+          setCards((prev) => prev.filter((c) => c.cardId !== cardId));
+          if (selectedCard?.cardId === cardId) setSelectedCard(null);
+        }
+        return;
+      }
+    }
+
     const res = await fetch("/api/v1/actions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -50,7 +70,7 @@ export default function FeedPage() {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error ?? "Action failed");
+      throw new Error((err as { error?: string }).error ?? "Action failed");
     }
 
     if (actionType === "DISMISS" || actionType === "SNOOZE") {
@@ -61,7 +81,26 @@ export default function FeedPage() {
 
   return (
     <FeedErrorBoundary>
-      <div className="space-y-4">
+      <div
+        ref={containerRef}
+        className="relative space-y-4 overflow-auto"
+        data-testid="feed-container"
+      >
+        {/* Pull-to-refresh indicator */}
+        {pullDistance > 0 && (
+          <div
+            data-testid="pull-to-refresh-indicator"
+            aria-live="polite"
+            style={{ height: `${Math.min(pullDistance, 60)}px` }}
+            className="flex items-center justify-center text-sm text-muted-foreground transition-all"
+          >
+            <RefreshCw
+              className={`h-5 w-5 ${isPulling ? "animate-spin text-primary" : ""}`}
+            />
+            <span className="ml-2">{isPulling ? "Release to refresh" : "Pull to refresh"}</span>
+          </div>
+        )}
+
         {/* Feed header */}
         <div className="flex items-center justify-between">
           <div>
@@ -87,10 +126,8 @@ export default function FeedPage() {
           </Button>
         </div>
 
-        {/* Loading skeleton */}
         {isLoading && <HCPFeedSkeleton count={5} />}
 
-        {/* Error state */}
         {!isLoading && error && (
           <div
             data-testid="feed-error"
@@ -110,7 +147,6 @@ export default function FeedPage() {
           </div>
         )}
 
-        {/* Empty state */}
         {!isLoading && !error && cards.length === 0 && (
           <div
             data-testid="feed-empty"
@@ -123,7 +159,6 @@ export default function FeedPage() {
           </div>
         )}
 
-        {/* NBA Cards */}
         {!isLoading && !error && cards.length > 0 && (
           <div
             data-testid="hcp-feed-list"
@@ -144,7 +179,6 @@ export default function FeedPage() {
         )}
       </div>
 
-      {/* HCP Detail Panel */}
       <HCPDetailPanel
         card={selectedCard}
         onClose={() => setSelectedCard(null)}
