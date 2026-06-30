@@ -13,9 +13,9 @@ type MRRow = {
 
 type ComplianceData = {
   complianceRate: number;
-  totalCards: number;
-  actedCards: number;
-  escalations: number;
+  actedCount: number;
+  totalHighPriority: number;
+  weeklyTrend: unknown[];
 };
 
 function StatCard({
@@ -59,17 +59,17 @@ export default function RSMDashboardPage() {
       fetch("/api/v1/rsm/compliance").then((r) => r.json()),
     ])
       .then(([teamJson, complianceJson]) => {
-        setTeam(teamJson.data?.data ?? []);
-        setCompliance(complianceJson.data ?? null);
+        setTeam(teamJson.data ?? []);
+        setCompliance(complianceJson ?? null);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  const compliancePct =
-    compliance
-      ? `${Math.round(compliance.complianceRate * 100)}%`
-      : "—";
+  const compliancePct = compliance ? `${compliance.complianceRate}%` : "—";
+  const escalations = compliance
+    ? compliance.totalHighPriority - compliance.actedCount
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -92,7 +92,7 @@ export default function RSMDashboardPage() {
           testId="escalations-card"
           icon={<AlertTriangle className="h-5 w-5 text-red-500" />}
           iconClass="bg-red-500/10"
-          value={loading ? "—" : String(compliance?.escalations ?? "—")}
+          value={loading ? "—" : String(escalations)}
           label="48h Escalations"
         />
         <StatCard

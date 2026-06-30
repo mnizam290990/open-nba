@@ -15,6 +15,7 @@
     "db:seed": "tsx src/seed.ts",
     "db:reset": "tsx src/reset.ts",
     "db:triggers": "tsx src/apply-triggers.ts",
+    "db:seed-demo": "tsx src/seed-demo-cards.ts",
     "seed": "tsx src/seed.ts",
     "reset": "tsx src/reset.ts",
     "triggers": "tsx src/apply-triggers.ts",

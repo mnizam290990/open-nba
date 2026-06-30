@@ -58,12 +58,12 @@ export default function AdminConsolePage() {
   useEffect(() => {
     fetch("/api/v1/admin/data-mode")
       .then((r) => r.json())
-      .then((j) => setDataMode(j.data?.mode ?? "MOCK"))
+      .then((j) => setDataMode(j.mode ?? "MOCK"))
       .catch(() => {});
 
     fetch("/api/v1/admin/health-metrics")
       .then((r) => r.json())
-      .then((j) => setHealth(j.data ?? null))
+      .then((j) => setHealth(j ?? null))
       .catch(() => {})
       .finally(() => setHealthLoading(false));
   }, []);
@@ -78,7 +78,7 @@ export default function AdminConsolePage() {
       const json = await res.json();
 
       if (res.ok) {
-        setDataMode(json.data?.mode ?? dataMode);
+        setDataMode(json.mode ?? dataMode);
       } else if (res.status === 422) {
         setToggleFailures(json.failures ?? []);
         setToggleError("Pre-flight checks failed. Resolve the issues below before switching to LIVE.");
