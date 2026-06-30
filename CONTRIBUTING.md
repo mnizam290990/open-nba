@@ -1,109 +1,118 @@
 # Contributing to openNBA
 
-Thank you for contributing. This guide covers local setup, coding standards, and the PR process.
-
----
-
 ## Prerequisites
 
-| Tool | Version | Install |
-|---|---|---|
-| Node.js | 20.x LTS | [nodejs.org](https://nodejs.org) |
-| pnpm | 9.x | `npm i -g pnpm` |
-| Python | 3.12 | [python.org](https://python.org) |
-| Docker + Compose | Latest | [docker.com](https://docker.com) |
-| uv | Latest | `pip install uv` |
-
-Verify all tools are installed:
+Verify all required tools are installed:
 
 ```bash
-node --version   # v20.x
-pnpm --version   # 9.x
-python --version # 3.12.x
-docker --version # 24.x+
-uv --version
+make onboarding-check
+# or manually:
+node --version    # ≥ 20.0.0
+pnpm --version    # ≥ 9.0.0
+python --version  # ≥ 3.12
+docker --version  # latest
+uv --version      # latest
 ```
-
----
 
 ## Local Setup
 
 ```bash
-# 1. Clone
-git clone https://github.com/mnizam290990/open-nba.git
-cd open-nba
+# 1. Clone the repository
+git clone https://github.com/nagarro/opennba.git
+cd opennba
 
-# 2. Install Node dependencies
+# 2. Install Node.js dependencies
 pnpm install
 
-# 3. Copy environment config
+# 3. Install Python dependencies
+cd services/agent && uv sync && cd ../..
+
+# 4. Copy environment config
 cp .env.example .env
-# DATA_MODE=MOCK is the default — no further config needed for local dev
+# Review .env — defaults work for MOCK mode
 
-# 4. Start the Next.js web app
+# 5. Start local services (PostgreSQL + Weaviate)
+docker compose -f infra/local/docker-compose.yml up db weaviate -d
+
+# 6. Run database migrations
+pnpm db:migrate
+
+# 7. Seed mock data
+pnpm db:seed
+
+# 8. Start the development servers
 pnpm dev
-# → http://localhost:3000
-
-# 5. (Optional) Start all services with Docker Compose
-docker compose up --build
 ```
+
+Open http://localhost:3000 — log in with `mr@demo.opennba.com / demo1234`.
 
 ---
 
 ## Code Style
 
-- **TypeScript:** Strict mode. No `any`. Fix all type errors before pushing.
-- **ESLint:** `pnpm lint` must pass. Fix with `pnpm lint:fix`.
-- **Prettier:** `pnpm format:check` must pass. Fix with `pnpm format`.
-- **Imports:** Use absolute imports via the `@/*` alias (maps to `apps/web/src/`).
-- **Comments:** Only explain non-obvious intent. No narration comments.
-- **Locators in tests:** Always use `data-testid`. Never use CSS selectors or XPath.
+- **TypeScript**: ESLint (`next/core-web-vitals`, `next/typescript`) + Prettier
+- **Python**: Ruff (linting + formatting) + mypy
+- Run `pnpm lint` before committing
+- Run `pnpm format` to auto-fix formatting
 
 ---
 
-## Branch Naming
+## Branch Naming Convention
 
 ```
-feat/<ticket-id>-short-description    # New feature
-fix/<ticket-id>-short-description     # Bug fix
-chore/<description>                   # Tooling / dependencies
-docs/<description>                    # Documentation only
+feat/<ticket-id>-short-description
+fix/<ticket-id>-short-description
+chore/<ticket-id>-short-description
 ```
+
+Example: `feat/NBA-42-hcp-card-component`
 
 ---
 
 ## PR Checklist
 
-Before opening a PR, run:
+Before opening a PR, verify:
 
-```bash
-pnpm lint          # ESLint must pass
-pnpm format:check  # Prettier must pass
-pnpm type-check    # TypeScript must pass
-pnpm test          # All tests must pass
-```
-
-Then fill out the PR template (`.github/PULL_REQUEST_TEMPLATE.md`).
+- [ ] `pnpm lint` passes
+- [ ] `pnpm type-check` passes
+- [ ] `pnpm test` passes
+- [ ] `pnpm format:check` passes
+- [ ] `data-testid` added to all new interactive UI elements
+- [ ] No secrets or `.env` values committed
+- [ ] `docs/` updated if behaviour changed
+- [ ] New API endpoints protected with `withAuth()` middleware
 
 ---
 
 ## Running Tests
 
 ```bash
-# Unit tests (watch mode)
-pnpm --filter @open-nba/web test:watch
-
-# Unit tests with coverage
-pnpm test:coverage
-
-# All tests across all packages
+# All unit tests
 pnpm test
-```
 
-Coverage targets: **≥ 80% lines, functions, branches, statements** for TypeScript packages.
+# Frontend unit tests with coverage
+pnpm --filter=web test:coverage
+
+# Python tests with coverage
+cd services/agent && uv run pytest --cov --cov-fail-under=80
+
+# Playwright E2E (requires running app)
+pnpm --filter=web test:e2e
+```
 
 ---
 
-## Questions?
+## Commit Message Format
 
-Open a GitHub Discussion or reach out to the Nagarro engineering team.
+```
+<type>(<scope>): <short description>
+
+[optional body]
+```
+
+Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci`
+
+Examples:
+- `feat(feed): add urgency badge to HCP card`
+- `fix(auth): redirect to callbackUrl after login`
+- `docs(scoring): document re-weighting algorithm`

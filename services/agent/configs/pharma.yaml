@@ -1,0 +1,50 @@
+# openNBA — Pharma Vertical Configuration
+# VerticalConfig for Sun Pharma Phase 0 Demo
+#
+# Weights must sum to 1.0
+# gap_threshold_days is also set via GAP_THRESHOLD_DAYS env var (env takes precedence)
+
+scoring:
+  weights:
+    gap: 0.40           # Visit gap (days since last visit)
+    tier: 0.30          # Prescriber tier (Tier 1 = highest)
+    therapy: 0.15       # Therapy area priority
+    acceptance: 0.15    # Historical visit acceptance rate (inverse)
+
+  gap_threshold_days: 60   # Days of inactivity before an HCP is flagged
+
+  therapy_area_priority:
+    ONCOLOGY: 100
+    CARDIOLOGY: 85
+    DIABETOLOGY: 70
+    NEUROLOGY: 55
+    RESPIRATORY: 40
+
+  tier_scores:
+    TIER_1: 100
+    TIER_2: 60
+    TIER_3: 30
+
+  urgency_thresholds:
+    high: 70   # score >= 70 → HIGH
+    medium: 40 # score >= 40 → MEDIUM (else LOW)
+
+# Feedback re-weighting schedule
+feedback:
+  reweight_schedule: "weekly"     # cron-compatible: weekly on Monday 00:00
+  min_samples_per_mr: 5           # Minimum feedback rows before re-weighting
+  learning_rate: 0.1              # Weight update step size per cycle
+  max_weight_change_per_cycle: 0.05  # Cap per-cycle weight delta
+
+# Pipeline settings
+pipeline:
+  timeout_seconds: 600         # Hard timeout per MR run (10 minutes)
+  max_retries: 3               # Per-step retry count
+  retry_backoff_seconds: [1, 2, 4]  # Exponential backoff delays
+
+# LLM content generation
+llm:
+  summary_max_sentences: 3
+  talking_points_count: 3
+  max_input_tokens: 2000
+  model: "anthropic.claude-3-5-sonnet-20241022-v2:0"  # or gpt-4o

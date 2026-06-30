@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
 
-export const runtime = "edge";
+export const dynamic = "force-dynamic";
 
-export function GET() {
-  return NextResponse.json(
-    {
-      status: "ok",
-      mode: process.env.DATA_MODE ?? "MOCK",
-      timestamp: new Date().toISOString(),
-    },
-    { status: 200 }
-  );
+export async function GET() {
+  return NextResponse.json({
+    status: "ok",
+    mode: process.env.DATA_MODE ?? "MOCK",
+    version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local",
+    timestamp: new Date().toISOString(),
+  });
 }

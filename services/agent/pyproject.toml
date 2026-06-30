@@ -1,0 +1,54 @@
+[project]
+name = "opennba-agent"
+version = "0.1.0"
+description = "openNBA Python Agent Service — FastAPI + LangGraph"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.32.1",
+    "pydantic==2.10.4",
+    "pydantic-settings==2.7.0",
+    "langgraph==0.2.61",
+    "langchain==0.3.14",
+    "langchain-openai==0.3.0",
+    "langchain-aws==0.2.9",
+    "langsmith==0.2.11",
+    "asyncpg==0.30.0",
+    "sqlalchemy==2.0.36",
+    "psycopg2-binary==2.9.10",
+    "python-dotenv==1.0.1",
+    "structlog==24.4.0",
+    "httpx==0.28.1",
+    "tenacity==9.0.0",
+    "pyyaml==6.0.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.4",
+    "pytest-asyncio==0.24.0",
+    "pytest-cov==6.0.0",
+    "ruff==0.8.6",
+    "mypy==1.14.1",
+    "httpx==0.28.1",
+    "faker==33.1.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "--cov=. --cov-report=html --cov-report=term-missing"

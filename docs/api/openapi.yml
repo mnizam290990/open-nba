@@ -1,0 +1,454 @@
+openapi: "3.1.0"
+info:
+  title: openNBA BFF API
+  version: "1.0.0"
+  description: >
+    Next.js BFF API for the openNBA Next Best Action platform.
+    All endpoints require a valid JWT session cookie (set by Auth.js).
+    Rate limits: 5 req/min on POST /api/v1/agent/run.
+
+servers:
+  - url: https://opennba.vercel.app
+    description: Production
+  - url: http://localhost:3000
+    description: Local development
+
+security:
+  - sessionCookie: []
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: next-auth.session-token
+
+  schemas:
+    Error:
+      type: object
+      required: [error, code]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        details:
+          type: object
+
+    Pagination:
+      type: object
+      required: [page, limit, total, totalPages, hasMore]
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+        hasMore:
+          type: boolean
+
+    TherapyArea:
+      type: string
+      enum: [CARDIOLOGY, ONCOLOGY, DIABETOLOGY, NEUROLOGY, RESPIRATORY]
+
+    PrescriberTier:
+      type: string
+      enum: [TIER_1, TIER_2, TIER_3]
+
+    UrgencyLevel:
+      type: string
+      enum: [HIGH, MEDIUM, LOW]
+
+    HCPProfile:
+      type: object
+      required: [hcpId, name, specialty, tier, territory, isActive, tenantId]
+      properties:
+        hcpId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        specialty:
+          $ref: "#/components/schemas/TherapyArea"
+        tier:
+          $ref: "#/components/schemas/PrescriberTier"
+        territory:
+          type: string
+        npi:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        tenantId:
+          type: string
+          format: uuid
+
+    NBACard:
+      type: object
+      required: [cardId, mrId, hcpId, priorityScore, urgencyLevel]
+      properties:
+        cardId:
+          type: string
+          format: uuid
+        mrId:
+          type: string
+          format: uuid
+        hcpId:
+          type: string
+          format: uuid
+        priorityScore:
+          type: number
+          minimum: 0
+          maximum: 100
+        urgencyLevel:
+          $ref: "#/components/schemas/UrgencyLevel"
+        daysSinceLastVisit:
+          type: integer
+          nullable: true
+        summary:
+          type: string
+          nullable: true
+        talkingPoints:
+          type: array
+          items:
+            type: string
+        isPartiallyEnriched:
+          type: boolean
+        isDismissed:
+          type: boolean
+        snoozedUntil:
+          type: string
+          format: date-time
+          nullable: true
+        hcp:
+          $ref: "#/components/schemas/HCPProfile"
+        offer:
+          $ref: "#/components/schemas/Offer"
+          nullable: true
+
+    Offer:
+      type: object
+      required: [offerId, type, therapyArea, title, isActive]
+      properties:
+        offerId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [SAMPLE, DETAIL_AID, REPRINTS, CME_INVITE, DIGITAL_ASSET]
+        therapyArea:
+          $ref: "#/components/schemas/TherapyArea"
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        assetUrl:
+          type: string
+          nullable: true
+        expiryDate:
+          type: string
+          format: date
+          nullable: true
+        isActive:
+          type: boolean
+
+    ActionType:
+      type: string
+      enum: [SCHEDULE_VISIT, LOG_CALL, DISMISS, SNOOZE]
+
+    ActionRequest:
+      type: object
+      required: [hcp_id, action_type]
+      properties:
+        hcp_id:
+          type: string
+          format: uuid
+        action_type:
+          $ref: "#/components/schemas/ActionType"
+        notes:
+          type: string
+          maxLength: 1000
+
+    HealthResponse:
+      type: object
+      required: [status, mode, timestamp]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        mode:
+          type: string
+          enum: [MOCK, LIVE]
+        version:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+paths:
+  /api/v1/health:
+    get:
+      summary: Liveness probe
+      description: Returns service health and current DATA_MODE.
+      operationId: getHealth
+      security: []
+      tags: [Health]
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/v1/hcps:
+    get:
+      summary: List HCP NBA cards for the authenticated MR
+      description: >
+        Returns paginated NBA cards sorted by priority score descending.
+        Scoped to the authenticated MR's portfolio (mr_id = session.user.id).
+        Dismissed cards are excluded by default.
+      operationId: listHCPs
+      tags: [HCPs]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: urgency
+          in: query
+          schema:
+            $ref: "#/components/schemas/UrgencyLevel"
+        - name: territory
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated list of NBA cards
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/NBACard"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/hcps/{hcp_id}:
+    get:
+      summary: Get single HCP detail
+      operationId: getHCP
+      tags: [HCPs]
+      parameters:
+        - name: hcp_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: HCP detail with NBA card and recent visits
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hcp:
+                    $ref: "#/components/schemas/HCPProfile"
+                  card:
+                    $ref: "#/components/schemas/NBACard"
+                    nullable: true
+                  recentVisits:
+                    type: array
+                    items:
+                      type: object
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: HCP not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/offers:
+    get:
+      summary: List active offer catalog
+      description: >
+        Returns all active, non-expired offers for the authenticated tenant.
+      operationId: listOffers
+      tags: [Offers]
+      responses:
+        "200":
+          description: List of active offers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Offer"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/actions:
+    post:
+      summary: Record an MR action on an NBA card
+      description: >
+        Accepts SCHEDULE_VISIT | LOG_CALL | DISMISS | SNOOZE.
+        Returns 202 Accepted immediately; async re-ranking is triggered in background.
+        Rate limit: 60 req/min per user.
+      operationId: createAction
+      tags: [Actions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionRequest"
+      responses:
+        "202":
+          description: Action accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  actionId:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [accepted]
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/agent/run:
+    post:
+      summary: Trigger on-demand NBA pipeline run for the authenticated MR
+      description: >
+        Starts an async agent pipeline run for the authenticated MR.
+        Returns a run_id for status polling.
+        Rate limit: 5 req/min per user.
+      operationId: triggerAgentRun
+      tags: [Agent]
+      responses:
+        "202":
+          description: Pipeline run queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  runId:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [QUEUED]
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/agent/status/{run_id}:
+    get:
+      summary: Poll pipeline run status
+      operationId: getAgentRunStatus
+      tags: [Agent]
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Run status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  runId:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [QUEUED, RUNNING, COMPLETED, FAILED, TIMEOUT, PARTIALLY_ENRICHED]
+                  cardsGenerated:
+                    type: integer
+                    nullable: true
+                  completedAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Run not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"

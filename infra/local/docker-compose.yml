@@ -1,0 +1,84 @@
+version: "3.9"
+
+services:
+  # ─────────────────────────────────────────────────────────────
+  # PostgreSQL
+  # ─────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: opennba
+      POSTGRES_PASSWORD: opennba_local
+      POSTGRES_DB: opennba
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opennba"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────────
+  # Weaviate (vector store)
+  # ─────────────────────────────────────────────────────────────
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.27.7
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "50051:50051"
+    environment:
+      WEAVIATE_AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: /var/lib/weaviate
+      DEFAULT_VECTORIZER_MODULE: none
+      CLUSTER_HOSTNAME: node1
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+
+  # ─────────────────────────────────────────────────────────────
+  # Python Agent Service
+  # ─────────────────────────────────────────────────────────────
+  agent:
+    build:
+      context: ../../services/agent
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATA_MODE: ${DATA_MODE:-MOCK}
+      DATABASE_URL: postgresql://opennba:opennba_local@db:5432/opennba
+      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────────────────────────
+  # Next.js Web App
+  # ─────────────────────────────────────────────────────────────
+  web:
+    build:
+      context: ../../apps/web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://opennba:opennba_local@db:5432/opennba
+      AGENT_SERVICE_URL: http://agent:8000
+      DATA_MODE: ${DATA_MODE:-MOCK}
+      NODE_ENV: development
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: local-dev-secret-minimum-32-characters-long
+    depends_on:
+      db:
+        condition: service_healthy
+      agent:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  weaviate_data:
