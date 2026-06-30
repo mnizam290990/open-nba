@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from config import get_settings
 from pipeline.orchestrator import AgentOrchestrator
 from providers.factory import create_data_provider
+from tracing import configure_tracing
 
 logger = structlog.get_logger(__name__)
 
@@ -21,10 +22,15 @@ logger = structlog.get_logger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     settings = get_settings()
+    tracing_enabled = configure_tracing(
+        api_key=settings.langsmith_api_key,
+        project=settings.langsmith_project,
+    )
     logger.info(
         "agent_service_startup",
         data_mode=settings.data_mode,
         version=settings.git_sha,
+        langsmith_tracing=tracing_enabled,
     )
     yield
     logger.info("agent_service_shutdown")

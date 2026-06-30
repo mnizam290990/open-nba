@@ -6,7 +6,6 @@ import { eq, and, count } from "drizzle-orm";
 import { withAuth, type AuthedRequest } from "@/lib/with-auth";
 import {
   ok,
-  noContent,
   badRequest,
   handleZodError,
   notFound,
@@ -14,7 +13,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-type Params = { offer_id: string };
+type Params = Promise<{ offer_id: string }>;
 
 const updateOfferSchema = z.object({
   title: z.string().min(2).max(200).optional(),
@@ -26,9 +25,10 @@ const updateOfferSchema = z.object({
 });
 
 async function getHandler(req: AuthedRequest, ctx: { params: Params }): Promise<NextResponse> {
+  const { offer_id } = await ctx.params;
   const offer = await db.query.offerCatalog.findFirst({
     where: and(
-      eq(offerCatalog.offerId, ctx.params.offer_id),
+      eq(offerCatalog.offerId, offer_id),
       eq(offerCatalog.tenantId, req.user.tenantId)
     ),
   });
@@ -40,9 +40,10 @@ async function updateHandler(
   req: AuthedRequest,
   ctx: { params: Params }
 ): Promise<NextResponse> {
+  const { offer_id } = await ctx.params;
   const offer = await db.query.offerCatalog.findFirst({
     where: and(
-      eq(offerCatalog.offerId, ctx.params.offer_id),
+      eq(offerCatalog.offerId, offer_id),
       eq(offerCatalog.tenantId, req.user.tenantId)
     ),
   });
@@ -68,11 +69,19 @@ async function updateHandler(
     .set(updates)
     .where(
       and(
-        eq(offerCatalog.offerId, ctx.params.offer_id),
+        eq(offerCatalog.offerId, offer_id),
         eq(offerCatalog.tenantId, req.user.tenantId)
       )
     )
     .returning();
+
+  await db.insert(auditLog).values({
+    eventType: "OFFER_UPDATED",
+    userId: req.user.id,
+    resourceId: offer_id,
+    ipAddress: req.headers.get("x-forwarded-for") ?? "unknown",
+    metadata: { action: "offer_updated", changes: Object.keys(parsed.data) },
+  });
 
   return ok(updated);
 }
@@ -81,9 +90,10 @@ async function deleteHandler(
   req: AuthedRequest,
   ctx: { params: Params }
 ): Promise<NextResponse> {
+  const { offer_id } = await ctx.params;
   const offer = await db.query.offerCatalog.findFirst({
     where: and(
-      eq(offerCatalog.offerId, ctx.params.offer_id),
+      eq(offerCatalog.offerId, offer_id),
       eq(offerCatalog.tenantId, req.user.tenantId)
     ),
   });
@@ -95,7 +105,7 @@ async function deleteHandler(
     .from(nbaCards)
     .where(
       and(
-        eq(nbaCards.offerId, ctx.params.offer_id),
+        eq(nbaCards.offerId, offer_id),
         eq(nbaCards.isDismissed, false),
         eq(nbaCards.tenantId, req.user.tenantId)
       )
@@ -106,12 +116,12 @@ async function deleteHandler(
   await db
     .update(offerCatalog)
     .set({ isActive: false, updatedAt: new Date() })
-    .where(eq(offerCatalog.offerId, ctx.params.offer_id));
+    .where(eq(offerCatalog.offerId, offer_id));
 
   await db.insert(auditLog).values({
-    eventType: "DATA_MODE_CHANGE",
+    eventType: "OFFER_DELETED",
     userId: req.user.id,
-    resourceId: ctx.params.offer_id,
+    resourceId: offer_id,
     ipAddress: req.headers.get("x-forwarded-for") ?? "unknown",
     metadata: { action: "offer_deactivated", activeCardsAffected: activeCount },
   });

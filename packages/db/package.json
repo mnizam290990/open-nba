@@ -14,8 +14,10 @@
     "db:migrate:check": "tsx src/migrate-check.ts",
     "db:seed": "tsx src/seed.ts",
     "db:reset": "tsx src/reset.ts",
+    "db:triggers": "tsx src/apply-triggers.ts",
     "seed": "tsx src/seed.ts",
     "reset": "tsx src/reset.ts",
+    "triggers": "tsx src/apply-triggers.ts",
     "studio": "drizzle-kit studio"
   },
   "dependencies": {

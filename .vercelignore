@@ -1,0 +1,14 @@
+# Exclude the Python agent service — only the Next.js web app is deployed here
+services/
+
+# Exclude test artifacts and local dev files
+node_modules/
+apps/web/node_modules/
+packages/db/node_modules/
+.next/
+apps/web/.next/
+coverage/
+**/*.test.ts
+**/*.spec.ts
+infra/
+docs/

@@ -9,7 +9,7 @@ import { ok, created, badRequest, handleZodError, notFound } from "@/lib/api-res
 export const dynamic = "force-dynamic";
 
 const createOfferSchema = z.object({
-  type: z.enum(["SAMPLE", "DETAIL_AID", "CME_INVITE", "PATIENT_MATERIAL", "SPEAKER_PROGRAM"]),
+  type: z.enum(["SAMPLE", "DETAIL_AID", "REPRINTS", "CME_INVITE", "DIGITAL_ASSET"]),
   therapyArea: z.enum(["CARDIOLOGY", "ONCOLOGY", "DIABETOLOGY", "NEUROLOGY", "RESPIRATORY"]),
   title: z.string().min(2).max(200),
   description: z.string().max(1000).optional(),
@@ -54,7 +54,7 @@ async function createHandler(req: AuthedRequest): Promise<NextResponse> {
     .returning();
 
   await db.insert(auditLog).values({
-    eventType: "DATA_MODE_CHANGE",
+    eventType: "OFFER_CREATED",
     userId: req.user.id,
     resourceId: offer?.offerId,
     ipAddress: req.headers.get("x-forwarded-for") ?? "unknown",

@@ -1,5 +1,8 @@
-import type { NextConfig } from "next";
-import withPWA from "next-pwa";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const withPWA = require("next-pwa");
+
+/** @type {import('next').NextConfig} */
 
 const securityHeaders = [
   {
@@ -24,7 +27,7 @@ const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
 ];
 
-const baseConfig: NextConfig = {
+const baseConfig = {
   transpilePackages: ["@opennba/db"],
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];

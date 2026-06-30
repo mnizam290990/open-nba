@@ -341,6 +341,16 @@ export const mrFeedback = pgTable(
 );
 
 // ─────────────────────────────────────────────────────────────
+// System Config (key-value store for runtime settings)
+// ─────────────────────────────────────────────────────────────
+
+export const systemConfig = pgTable("system_config", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+// ─────────────────────────────────────────────────────────────
 // Relations
 // ─────────────────────────────────────────────────────────────
 

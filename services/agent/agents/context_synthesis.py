@@ -78,13 +78,25 @@ def _strip_hallucinated_drugs(
     return " ".join(filtered) if filtered else content
 
 
-async def _call_llm(prompt: str, config: dict[str, Any]) -> dict[str, Any]:
+async def _call_llm(
+    prompt: str,
+    config: dict[str, Any],
+    run_metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """
     Call the configured LLM provider.
     Returns a dict with 'summary' and 'talking_points' keys.
     Raises ValueError on malformed output.
+
+    run_metadata is forwarded as LangSmith run metadata when tracing is enabled.
     """
+    from langchain_core.runnables import RunnableConfig
+
     model = config.get("model", "")
+    lc_config = RunnableConfig(
+        metadata=run_metadata or {},
+        tags=["context_synthesis", "opennba"],
+    )
 
     if "gpt" in model.lower() or not model:
         from langchain_openai import ChatOpenAI
@@ -93,7 +105,7 @@ async def _call_llm(prompt: str, config: dict[str, Any]) -> dict[str, Any]:
         from langchain_aws import ChatBedrock
         llm = ChatBedrock(model_id=model, model_kwargs={"temperature": 0.3})
 
-    response = await llm.ainvoke(prompt)
+    response = await llm.ainvoke(prompt, config=lc_config)
     content = response.content if hasattr(response, "content") else str(response)
 
     json_match = re.search(r"\{.*\}", content, re.DOTALL)
@@ -163,7 +175,15 @@ async def run_context_synthesis(
             for attempt in range(2):
                 try:
                     t0 = time.time()
-                    result = await _call_llm(prompt, cfg)
+                    result = await _call_llm(
+                        prompt,
+                        cfg,
+                        run_metadata={
+                            "hcp_id": scored_hcp.hcp_id,
+                            "mr_id": state.mr_id,
+                            "attempt": attempt,
+                        },
+                    )
                     latency_ms = int((time.time() - t0) * 1000)
                     logger.info(
                         "llm_call_success",

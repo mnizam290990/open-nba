@@ -1,14 +1,75 @@
-import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
-import { Users, TrendingUp, AlertTriangle } from "lucide-react";
+"use client";
 
-export default async function RSMDashboardPage() {
-  const session = await auth();
-  const userRole = (session?.user as { role?: string })?.role;
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Users, TrendingUp, AlertTriangle, ChevronRight } from "lucide-react";
 
-  if (userRole === "MR") {
-    redirect("/feed?accessDenied=true");
-  }
+type MRRow = {
+  mrId: string;
+  name: string;
+  territory: string;
+  lastActivityAt: string | null;
+};
+
+type ComplianceData = {
+  complianceRate: number;
+  totalCards: number;
+  actedCards: number;
+  escalations: number;
+};
+
+function StatCard({
+  testId,
+  icon,
+  value,
+  label,
+  iconClass,
+}: {
+  testId: string;
+  icon: React.ReactNode;
+  value: string;
+  label: string;
+  iconClass: string;
+}) {
+  return (
+    <div data-testid={testId} className="rounded-xl border bg-card p-5">
+      <div className="flex items-center gap-3">
+        <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${iconClass}`}>
+          {icon}
+        </div>
+        <div>
+          <p className="text-2xl font-bold">{value}</p>
+          <p className="text-sm text-muted-foreground">{label}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function RSMDashboardPage() {
+  const router = useRouter();
+
+  const [team, setTeam] = useState<MRRow[]>([]);
+  const [compliance, setCompliance] = useState<ComplianceData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/v1/rsm/team").then((r) => r.json()),
+      fetch("/api/v1/rsm/compliance").then((r) => r.json()),
+    ])
+      .then(([teamJson, complianceJson]) => {
+        setTeam(teamJson.data?.data ?? []);
+        setCompliance(complianceJson.data ?? null);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const compliancePct =
+    compliance
+      ? `${Math.round(compliance.complianceRate * 100)}%`
+      : "—";
 
   return (
     <div className="space-y-6">
@@ -16,88 +77,83 @@ export default async function RSMDashboardPage() {
         <h1 data-testid="rsm-dashboard-heading" className="text-xl font-bold">
           Team Dashboard
         </h1>
-        <p className="text-sm text-muted-foreground">
-          NBA compliance and territory overview
-        </p>
+        <p className="text-sm text-muted-foreground">NBA compliance and territory overview</p>
       </div>
 
-      {/* Compliance Metric */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <div
-          data-testid="compliance-rate-card"
-          className="rounded-xl border bg-card p-5"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <TrendingUp className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p
-                data-testid="compliance-rate-value"
-                className="text-2xl font-bold"
-              >
-                —
-              </p>
-              <p className="text-sm text-muted-foreground">NBA Compliance Rate</p>
-            </div>
-          </div>
-        </div>
-
-        <div
-          data-testid="escalations-card"
-          className="rounded-xl border bg-card p-5"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/10">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
-            </div>
-            <div>
-              <p
-                data-testid="escalations-value"
-                className="text-2xl font-bold"
-              >
-                —
-              </p>
-              <p className="text-sm text-muted-foreground">48h Escalations</p>
-            </div>
-          </div>
-        </div>
-
-        <div
-          data-testid="team-size-card"
-          className="rounded-xl border bg-card p-5"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Users className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p
-                data-testid="team-size-value"
-                className="text-2xl font-bold"
-              >
-                —
-              </p>
-              <p className="text-sm text-muted-foreground">Team Members</p>
-            </div>
-          </div>
-        </div>
+        <StatCard
+          testId="compliance-rate-card"
+          icon={<TrendingUp className="h-5 w-5 text-primary" />}
+          iconClass="bg-primary/10"
+          value={loading ? "—" : compliancePct}
+          label="NBA Compliance Rate"
+        />
+        <StatCard
+          testId="escalations-card"
+          icon={<AlertTriangle className="h-5 w-5 text-red-500" />}
+          iconClass="bg-red-500/10"
+          value={loading ? "—" : String(compliance?.escalations ?? "—")}
+          label="48h Escalations"
+        />
+        <StatCard
+          testId="team-size-card"
+          icon={<Users className="h-5 w-5 text-primary" />}
+          iconClass="bg-primary/10"
+          value={loading ? "—" : String(team.length)}
+          label="Team Members"
+        />
       </div>
 
-      {/* Team Table */}
-      <section
-        data-testid="team-table-section"
-        className="rounded-xl border bg-card"
-      >
+      <section data-testid="team-table-section" className="rounded-xl border bg-card">
         <div className="border-b px-5 py-4">
           <h2 className="font-semibold">MR Overview</h2>
         </div>
-        <div
-          data-testid="team-table-body"
-          className="px-5 py-4 text-center text-sm text-muted-foreground"
-        >
-          Team data will appear here once the agent pipeline has run.
-        </div>
+
+        {loading && (
+          <div
+            data-testid="team-table-body"
+            className="px-5 py-8 text-center text-sm text-muted-foreground"
+          >
+            Loading team data…
+          </div>
+        )}
+
+        {!loading && team.length === 0 && (
+          <div
+            data-testid="team-table-body"
+            className="px-5 py-8 text-center text-sm text-muted-foreground"
+          >
+            Team data will appear here once the agent pipeline has run.
+          </div>
+        )}
+
+        {!loading && team.length > 0 && (
+          <ul data-testid="team-table-body">
+            {team.map((mr) => (
+              <li key={mr.mrId} className="border-b last:border-b-0">
+                <button
+                  data-testid="rsm-mr-row"
+                  className="flex w-full items-center justify-between px-5 py-4 text-left hover:bg-muted/40 transition-colors"
+                  onClick={() => router.push(`/rsm/mr/${mr.mrId}`)}
+                  aria-label={`View details for ${mr.name}`}
+                >
+                  <div>
+                    <p className="font-medium">{mr.name}</p>
+                    <p className="text-xs text-muted-foreground">{mr.territory}</p>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                    <span>
+                      {mr.lastActivityAt
+                        ? `Last active ${new Date(mr.lastActivityAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`
+                        : "No activity recorded"}
+                    </span>
+                    <ChevronRight className="h-4 w-4" />
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </div>
   );
