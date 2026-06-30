@@ -189,7 +189,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: DB migration dry-run
-        run: pnpm db:migrate --check
+        run: pnpm db:migrate:check
         env:
           DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
 

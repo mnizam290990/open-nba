@@ -38,10 +38,16 @@
     "db:migrate": {
       "cache": false
     },
+    "db:migrate:check": {
+      "cache": false
+    },
     "db:seed": {
       "cache": false
     },
     "db:reset": {
+      "cache": false
+    },
+    "headers:check": {
       "cache": false
     },
     "clean": {

@@ -24,9 +24,11 @@
     "test:coverage": "turbo run test:coverage",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,md}\" --ignore-path .gitignore",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,md}\" --ignore-path .gitignore",
-    "db:migrate": "turbo run db:migrate --filter=@open-nba/db",
-    "db:seed": "turbo run db:seed --filter=@open-nba/db",
-    "db:reset": "turbo run db:reset --filter=@open-nba/db",
+    "db:migrate": "turbo run db:migrate --filter=@opennba/db",
+    "db:migrate:check": "turbo run db:migrate:check --filter=@opennba/db",
+    "db:seed": "turbo run db:seed --filter=@opennba/db",
+    "db:reset": "turbo run db:reset --filter=@opennba/db",
+    "headers:check": "turbo run headers:check --filter=@open-nba/web",
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {

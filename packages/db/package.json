@@ -10,6 +10,10 @@
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
     "migrate:check": "tsx src/migrate-check.ts",
+    "db:migrate": "drizzle-kit migrate",
+    "db:migrate:check": "tsx src/migrate-check.ts",
+    "db:seed": "tsx src/seed.ts",
+    "db:reset": "tsx src/reset.ts",
     "seed": "tsx src/seed.ts",
     "reset": "tsx src/reset.ts",
     "studio": "drizzle-kit studio"
