@@ -13,6 +13,8 @@ export interface HCPCardData {
   urgencyLevel: "HIGH" | "MEDIUM" | "LOW";
   daysSinceLastVisit: number | null;
   isPartiallyEnriched: boolean;
+  summary?: string | null;
+  talkingPoints?: string[];
   hcp: {
     name: string;
     specialty: string;
