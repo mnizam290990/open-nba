@@ -42,7 +42,10 @@ export function withAuth<T extends Record<string, string> = Record<string, strin
     : (optionsOrRoles ?? {});
   const { requiredRoles, rateLimit = 60 } = options;
 
-  return async (req: NextRequest, ctx: { params: T }): Promise<NextResponse> => {
+  return async (
+    req: NextRequest,
+    ctx?: { params?: T | Promise<T> }
+  ): Promise<NextResponse> => {
     const session = await auth();
 
     if (!session?.user?.id) {
@@ -77,6 +80,7 @@ export function withAuth<T extends Record<string, string> = Record<string, strin
       email: session.user.email as string,
     };
 
-    return handler(authedReq, ctx);
+    const params = (await Promise.resolve(ctx?.params ?? ({} as T))) as T;
+    return handler(authedReq, { params });
   };
 }

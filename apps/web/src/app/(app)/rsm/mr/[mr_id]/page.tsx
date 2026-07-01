@@ -127,15 +127,44 @@ export default function RSMMRDrillDownPage() {
   const [expandedHcpId, setExpandedHcpId] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoading(true);
-    fetch(`/api/v1/rsm/mr/${mr_id}`)
-      .then((r) => r.json())
-      .then((json) => {
-        if (json.hcps) setHcps(json.hcps ?? []);
-        else setError("Failed to load MR data.");
-      })
-      .catch(() => setError("Network error."))
-      .finally(() => setLoading(false));
+    if (!mr_id) return;
+
+    let cancelled = false;
+
+    async function loadMrDetail() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const res = await fetch(`/api/v1/rsm/mr/${encodeURIComponent(mr_id)}`);
+        const json = (await res.json().catch(() => null)) as {
+          hcps?: HCPRecord[];
+          error?: string;
+        } | null;
+
+        if (cancelled) return;
+
+        if (!res.ok) {
+          setError(json?.error ?? `Failed to load MR data (${res.status}).`);
+          return;
+        }
+
+        if (Array.isArray(json?.hcps)) {
+          setHcps(json.hcps);
+        } else {
+          setError("Failed to load MR data.");
+        }
+      } catch {
+        if (!cancelled) setError("Network error.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadMrDetail();
+    return () => {
+      cancelled = true;
+    };
   }, [mr_id]);
 
   const toggleHcp = (id: string) =>

@@ -139,8 +139,10 @@ async function main() {
     mrId: demoMR.id,
     hcpId: hcp.hcpId,
     actionType: ACTION_TYPES[i % ACTION_TYPES.length],
-    outcome: OUTCOMES[i % OUTCOMES.length],
-    notes: `Visit completed. ${OUTCOMES[i % OUTCOMES.length]}.`,
+    metadata: {
+      outcome: OUTCOMES[i % OUTCOMES.length],
+      notes: `Visit completed. ${OUTCOMES[i % OUTCOMES.length]}.`,
+    },
     timestamp: new Date(Date.now() - (i + 1) * 24 * 60 * 60 * 1000),
     tenantId: TENANT_ID,
   }));
@@ -193,8 +195,10 @@ async function main() {
         mrId: mrProfile.mrId,
         hcpId: teamHCPs[0].hcpId,
         actionType: ACTION_TYPES[Math.floor(Math.random() * ACTION_TYPES.length)],
-        outcome: OUTCOMES[Math.floor(Math.random() * OUTCOMES.length)],
-        notes: "Routine follow-up completed.",
+        metadata: {
+          outcome: OUTCOMES[Math.floor(Math.random() * OUTCOMES.length)],
+          notes: "Routine follow-up completed.",
+        },
         timestamp: new Date(Date.now() - Math.floor(Math.random() * 7) * 24 * 60 * 60 * 1000),
         tenantId: TENANT_ID,
       }).onConflictDoNothing();
